@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Plus, Minus, Calculator, Download } from 'lucide-react';
+import { Plus, Minus, Calculator, Download, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,6 +120,200 @@ const InvoiceCreation = () => {
     txtContent += `${total.toFixed(2)}|`; // Total
     
     return txtContent;
+  };
+
+  // Función para convertir números a letras
+  const numberToWords = (num) => {
+    const units = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+    const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+    const tens = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+    const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+    
+    if (num === 0) return 'CERO';
+    if (num === 100) return 'CIEN';
+    
+    let result = '';
+    const integer = Math.floor(num);
+    const decimal = Math.round((num - integer) * 100);
+    
+    if (integer >= 1000) {
+      const thousands = Math.floor(integer / 1000);
+      if (thousands === 1) {
+        result += 'MIL ';
+      } else {
+        result += numberToWords(thousands) + ' MIL ';
+      }
+    }
+    
+    const remainder = integer % 1000;
+    if (remainder >= 100) {
+      result += hundreds[Math.floor(remainder / 100)] + ' ';
+    }
+    
+    const lastTwo = remainder % 100;
+    if (lastTwo >= 20) {
+      result += tens[Math.floor(lastTwo / 10)];
+      if (lastTwo % 10 > 0) {
+        result += ' Y ' + units[lastTwo % 10];
+      }
+    } else if (lastTwo >= 10) {
+      result += teens[lastTwo - 10];
+    } else if (lastTwo > 0) {
+      result += units[lastTwo];
+    }
+    
+    result = result.trim();
+    if (decimal > 0) {
+      result += ` CON ${decimal.toString().padStart(2, '0')}/100`;
+    } else {
+      result += ' CON 00/100';
+    }
+    
+    return result + ' SOLES';
+  };
+  
+  const generatePDF = () => {
+    if (!selectedClient) {
+      alert('Debe seleccionar un cliente');
+      return;
+    }
+    
+    if (invoiceItems.some(item => !item.productCode || !item.description)) {
+      alert('Todos los items deben tener código y descripción');
+      return;
+    }
+
+    const selectedClientData = clients.find(c => c.id.toString() === selectedClient);
+    const currentDate = new Date();
+    const series = invoiceType === 'FACTURA' ? 'F001' : 'B001';
+    const number = '00001237';
+    
+    const doc = new jsPDF();
+    
+    // Configurar fuente
+    doc.setFont('helvetica');
+    
+    // ENCABEZADO
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EMPRESA FACTURADORA S.A.C.', 20, 20);
+    doc.setFont('helvetica', 'normal');
+    doc.text('RUC: 20123456789', 20, 28);
+    doc.text('Av. Los Empresarios 123, Lima - Perú', 20, 35);
+    
+    // Título del documento
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    const docTitle = invoiceType === 'FACTURA' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA';
+    doc.text(docTitle, 20, 50);
+    
+    // Serie y número
+    doc.setFontSize(14);
+    doc.text(`${series}-${number}`, 20, 60);
+    
+    // Fecha y hora
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Fecha de Emisión: ${currentDate.toLocaleDateString('es-PE')}`, 20, 70);
+    doc.text(`Hora: ${currentDate.toLocaleTimeString('es-PE')}`, 20, 77);
+    
+    // DATOS DEL CLIENTE
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATOS DEL CLIENTE:', 20, 90);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (selectedClientData) {
+      const docType = selectedClientData.document.length === 8 ? 'DNI' : 'RUC';
+      doc.text(`${docType}: ${selectedClientData.document}`, 20, 100);
+      doc.text(`Razón Social: ${selectedClientData.name}`, 20, 107);
+      doc.text('Dirección: Av. Cliente 456, Lima - Perú', 20, 114);
+    }
+    
+    // TABLA DE PRODUCTOS/SERVICIOS
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DETALLE:', 20, 130);
+    
+    // Cabecera de tabla
+    doc.setFontSize(9);
+    doc.text('Código', 20, 140);
+    doc.text('Descripción', 45, 140);
+    doc.text('Cant.', 120, 140);
+    doc.text('U.M.', 135, 140);
+    doc.text('V.Unit.', 150, 140);
+    doc.text('P.Unit.', 170, 140);
+    doc.text('Total', 185, 140);
+    
+    // Línea separadora
+    doc.line(20, 142, 200, 142);
+    
+    // Detalle de items
+    let yPosition = 150;
+    doc.setFont('helvetica', 'normal');
+    
+    invoiceItems.forEach((item) => {
+      if (item.productCode && item.description) {
+        const priceWithIgv = item.unitPrice * 1.18;
+        
+        doc.text(item.productCode, 20, yPosition);
+        doc.text(item.description.substring(0, 25) + (item.description.length > 25 ? '...' : ''), 45, yPosition);
+        doc.text(item.quantity.toString(), 120, yPosition);
+        doc.text('NIU', 135, yPosition);
+        doc.text(`S/ ${item.unitPrice.toFixed(2)}`, 150, yPosition);
+        doc.text(`S/ ${priceWithIgv.toFixed(2)}`, 170, yPosition);
+        doc.text(`S/ ${(item.total * 1.18).toFixed(2)}`, 185, yPosition);
+        
+        yPosition += 8;
+      }
+    });
+    
+    // Línea separadora
+    doc.line(20, yPosition, 200, yPosition);
+    yPosition += 10;
+    
+    // TOTALES
+    doc.setFont('helvetica', 'bold');
+    doc.text('Operaciones Gravadas:', 130, yPosition);
+    doc.text(`S/ ${subtotal.toFixed(2)}`, 185, yPosition);
+    yPosition += 8;
+    
+    doc.text('IGV (18%):', 130, yPosition);
+    doc.text(`S/ ${igv.toFixed(2)}`, 185, yPosition);
+    yPosition += 8;
+    
+    doc.setFontSize(12);
+    doc.text('IMPORTE TOTAL:', 130, yPosition);
+    doc.text(`S/ ${total.toFixed(2)}`, 185, yPosition);
+    yPosition += 15;
+    
+    // Importe en letras
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`SON: ${numberToWords(total)}`, 20, yPosition);
+    yPosition += 15;
+    
+    // INFORMACIÓN ADICIONAL OBLIGATORIA
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORMACIÓN ADICIONAL:', 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text('Código Hash: ABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ', 20, yPosition);
+    yPosition += 8;
+    doc.text('Código QR: [QR con datos del comprobante]', 20, yPosition);
+    yPosition += 15;
+    
+    // Texto legal
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Representación impresa de la Factura Electrónica', 20, yPosition);
+    doc.text('Autorizada mediante Resolución de Intendencia No. 034-005-0000971/SUNAT', 20, yPosition + 6);
+    
+    // Descargar PDF
+    doc.save(`${series}-${number}.pdf`);
+    alert('PDF generado y descargado exitosamente');
   };
 
   const handleSubmit = (e) => {
@@ -340,6 +535,10 @@ const InvoiceCreation = () => {
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline">
             Guardar Borrador
+          </Button>
+          <Button type="button" onClick={generatePDF} className="bg-green-600 hover:bg-green-700">
+            <FileText className="mr-2 h-4 w-4" />
+            Generar PDF
           </Button>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
             <Download className="mr-2 h-4 w-4" />
