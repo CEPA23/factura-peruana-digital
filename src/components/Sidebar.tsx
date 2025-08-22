@@ -19,6 +19,7 @@ const Sidebar = () => {
     { icon: FileText, label: 'Nueva Factura', path: '/facturas/nueva' },
     { icon: History, label: 'Historial', path: '/facturas/historial' },
     { icon: BarChart3, label: 'Reportes', path: '/reportes' },
+    { icon: Settings, label: 'Configuración', path: '/configuracion' },
   ];
 
   return (

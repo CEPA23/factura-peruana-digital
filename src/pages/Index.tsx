@@ -7,6 +7,7 @@ import ProductManagement from '../components/ProductManagement';
 import InvoiceCreation from '../components/InvoiceCreation';
 import InvoiceHistory from '../components/InvoiceHistory';
 import Reports from '../components/Reports';
+import Configuration from '../components/Configuration';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
@@ -25,6 +26,7 @@ const Index = () => {
               <Route path="/facturas/nueva" element={<InvoiceCreation />} />
               <Route path="/facturas/historial" element={<InvoiceHistory />} />
               <Route path="/reportes" element={<Reports />} />
+              <Route path="/configuracion" element={<Configuration />} />
             </Routes>
           </main>
         </div>
