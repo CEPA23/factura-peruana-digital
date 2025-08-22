@@ -536,7 +536,7 @@ const InvoiceCreation = () => {
           <Button type="button" variant="outline">
             Guardar Borrador
           </Button>
-          <Button type="button" onClick={generatePDF} className="bg-green-600 hover:bg-green-700">
+          <Button type="button" onClick={generatePDF} className="bg-blue-600 hover:bg-blue-700 text-white">
             <FileText className="mr-2 h-4 w-4" />
             Generar PDF
           </Button>
