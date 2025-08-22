@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Minus, Calculator, Send } from 'lucide-react';
+import { Plus, Minus, Calculator, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,21 +71,82 @@ const InvoiceCreation = () => {
   const igv = subtotal * 0.18;
   const total = subtotal + igv;
 
+  const generateSunatTxt = () => {
+    const selectedClientData = clients.find(c => c.id.toString() === selectedClient);
+    const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const series = invoiceType === 'FACTURA' ? 'F001' : 'B001';
+    const number = '00001237';
+    
+    // Formato TXT básico según especificaciones SUNAT
+    let txtContent = '';
+    
+    // Cabecera del comprobante
+    txtContent += `${invoiceType === 'FACTURA' ? '01' : '03'}|`; // Tipo documento
+    txtContent += `${series}|`; // Serie
+    txtContent += `${number}|`; // Número
+    txtContent += `${currentDate}|`; // Fecha emisión
+    txtContent += `PEN|`; // Moneda
+    
+    // Datos del cliente
+    if (selectedClientData) {
+      txtContent += `${selectedClientData.document.length === 8 ? '1' : '6'}|`; // Tipo doc cliente
+      txtContent += `${selectedClientData.document}|`; // Número documento
+      txtContent += `${selectedClientData.name}|`; // Razón social
+    }
+    
+    txtContent += `\n`;
+    
+    // Detalle de items
+    invoiceItems.forEach((item, index) => {
+      if (item.productCode && item.description) {
+        txtContent += `${index + 1}|`; // Número de línea
+        txtContent += `${item.productCode}|`; // Código producto
+        txtContent += `${item.description}|`; // Descripción
+        txtContent += `${item.quantity}|`; // Cantidad
+        txtContent += `NIU|`; // Unidad de medida
+        txtContent += `${item.unitPrice.toFixed(2)}|`; // Precio unitario
+        txtContent += `${item.total.toFixed(2)}|`; // Valor venta
+        txtContent += `10|`; // Código tipo afectación IGV (gravado)
+        txtContent += `${(item.total * 0.18).toFixed(2)}|`; // IGV
+        txtContent += `\n`;
+      }
+    });
+    
+    // Totales
+    txtContent += `TOTALES|`;
+    txtContent += `${subtotal.toFixed(2)}|`; // Subtotal
+    txtContent += `${igv.toFixed(2)}|`; // IGV
+    txtContent += `${total.toFixed(2)}|`; // Total
+    
+    return txtContent;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    const invoiceData = {
-      type: invoiceType,
-      client: selectedClient,
-      items: invoiceItems,
-      subtotal,
-      igv,
-      total,
-      date: new Date().toISOString().split('T')[0]
-    };
+    if (!selectedClient) {
+      alert('Debe seleccionar un cliente');
+      return;
+    }
     
-    console.log('Factura creada:', invoiceData);
-    alert('Factura creada exitosamente y enviada a SUNAT');
+    if (invoiceItems.some(item => !item.productCode || !item.description)) {
+      alert('Todos los items deben tener código y descripción');
+      return;
+    }
+    
+    // Generar y descargar archivo TXT
+    const txtContent = generateSunatTxt();
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${invoiceType === 'FACTURA' ? 'F001' : 'B001'}-00001237.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    alert('Archivo TXT generado y descargado exitosamente');
   };
 
   return (
@@ -281,8 +342,8 @@ const InvoiceCreation = () => {
             Guardar Borrador
           </Button>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            <Send className="mr-2 h-4 w-4" />
-            Emitir y Enviar a SUNAT
+            <Download className="mr-2 h-4 w-4" />
+            Descargar TXT
           </Button>
         </div>
       </form>
